@@ -1,7 +1,8 @@
 import pathlib
 import re
+import random
 
-gcode_input_file = 'SkirtCube.gcode'
+gcode_input_file = 'Cube 0.6mm 20%.gcode'
 
 
 class GcodeModifier:
@@ -28,14 +29,27 @@ class GcodeModifier:
 
         return layers
 
+    def extract_layer(self, layer_to_extract):
+        try:
+            extracted_layer = self.gcode[self.print_layers[layer_to_extract]:self.print_layers[layer_to_extract + 1]]
+        except IndexError as err:
+            extracted_layer = self.gcode[self.print_layers[layer_to_extract]:]
+        return extracted_layer
+
+    def replace_layer(self, layer_to_replace, replacement_layer):
+        try:
+            self.gcode[self.print_layers[layer_to_replace]:self.print_layers[layer_to_replace + 1]] = replacement_layer
+        except IndexError:
+            self.gcode[self.print_layers[layer_to_replace]:] = replacement_layer
+
     def shift_layer(self, print_layer, x_shift=0.0, y_shift=0.0):
-        # extract slice from gcode correspond to print layer
-        print_layer_gcode = self.gcode[self.print_layers[print_layer]:self.print_layers[print_layer + 1]]
+        # extract layer from gcode corresponding to print layer
+        print_layer_gcode = self.extract_layer(print_layer)
 
         # regex of line to modify
         p = re.compile(r'G1 X(?P<x>\d+.\d+) Y(?P<y>\d+.\d+)')
 
-        # enumerate so the line can modified
+        # enumerate so the line can modified while being iterated over
         for i, line in enumerate(print_layer_gcode):
             m = p.search(line)
             if m:
@@ -47,8 +61,32 @@ class GcodeModifier:
                 print_layer_gcode[i] = p.sub(f'G1 X{x} Y{y}', line)
 
         # update gcode
-        self.gcode[self.print_layers[print_layer]:self.print_layers[print_layer + 1]] = print_layer_gcode
+        self.replace_layer(print_layer, print_layer_gcode)
         print(f"Shifted layer {print_layer} by dX = {x_shift}, dY = {y_shift}.")
+
+    def garble_layer(self, print_layer, max_shift_x=0.0, max_shift_y=0.0):
+        # extract layer from gcode corresponding to print layer
+        print_layer_gcode = self.extract_layer(print_layer)
+
+        # regex of line to modify
+        p = re.compile(r'G1 X(?P<x>\d+.\d+) Y(?P<y>\d+.\d+)')
+
+        # enumerate so the line can modified while being iterated over
+        for i, line in enumerate(print_layer_gcode):
+            m = p.search(line)
+
+            # randomly skip layers to modify
+            if m and random.choice('yn') == 'y':
+                # randomly modify x and y values
+                x = float(m.group('x')) + random.random() * max_shift_x
+                y = float(m.group('y')) + random.random() * max_shift_y
+
+                # update line with shifted x and y values
+                print_layer_gcode[i] = p.sub(f'G1 X{x} Y{y}', line)
+
+        # update gcode
+        self.replace_layer(print_layer, print_layer_gcode)
+        print(f"Randomly modified layer {print_layer}, max shift x = {max_shift_x}, max shift y = {max_shift_y}.")
 
     def export_gcode(self, filename):
         """Exports modified gcode to a .gcode file.
@@ -71,12 +109,31 @@ if __name__ == "__main__":
 
     print(f"Number of print layers: {sorted(gcode_modifier.print_layers)[-1]}")
 
-    # ask for layer to modify
-    layer_to_modify = int(input("Which layer would you like to modify?: "))
-    x_delta = float(input("How much to shift X axis?: "))
-    y_delta = float(input("How much to shift Y axis?: "))
+    mod_to_perform = ''
+    while mod_to_perform != 'none':
+        # ask for modification to perform
+        mod_to_perform = input("What modification would you like to perform (shift, garble, none)?: ")
 
-    gcode_modifier.shift_layer(layer_to_modify, x_delta, y_delta)
+        if mod_to_perform == 'none':
+            print("No modification selected.")
+            continue
+
+        # ask for layer to modify
+        layer_to_modify = int(input("Which layer would you like to modify?: "))
+
+        if mod_to_perform == 'shift':
+            x_delta = float(input("How much to shift X axis?: "))
+            y_delta = float(input("How much to shift Y axis?: "))
+            gcode_modifier.shift_layer(print_layer=layer_to_modify,
+                                       x_shift=x_delta,
+                                       y_shift=y_delta)
+
+        elif mod_to_perform == 'garble':
+            x_delta = float(input("Max amount to shift X axis?: "))
+            y_delta = float(input("Max amount to shift Y axis?: "))
+            gcode_modifier.garble_layer(print_layer=layer_to_modify,
+                                        max_shift_x=x_delta,
+                                        max_shift_y=y_delta)
 
     output_file = input("What is the name of the file you would like to write the modified gcode to?: ")
     gcode_modifier.export_gcode(output_file)
