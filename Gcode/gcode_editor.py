@@ -16,7 +16,7 @@ class GcodeModifier:
         """Gets line numbers of each print layer.
 
         Returns:
-            dict: Layer number and gcode line index.
+            dict: Layer number and gcode line index for start[0] and end[1] of layer.
         """
 
         layers = dict()
@@ -42,12 +42,36 @@ class GcodeModifier:
         return layers
 
     def extract_layer(self, layer_to_extract):
-        return self.gcode[self.print_layers[layer_to_extract[0]]:self.print_layers[layer_to_extract[1]]]
+        """Extracts all print layer lines from gcode.
+
+        Args:
+            layer_to_extract (int): The layer to extract.
+
+        Returns:
+            list: The print layers gcode lines.
+        """
+
+        return self.gcode[self.print_layers[layer_to_extract][0]:self.print_layers[layer_to_extract][1]]
 
     def replace_layer(self, layer_to_replace, replacement_layer):
-        self.gcode[self.print_layers[layer_to_replace[0]]:self.print_layers[layer_to_replace[1]]] = replacement_layer
+        """Replaces the layer in gcode with the layer passed to the function.
+
+        Args:
+            layer_to_replace (int): The print layer to replace.
+            replacement_layer (list): The replacement layers.
+        """
+
+        self.gcode[self.print_layers[layer_to_replace][0]:self.print_layers[layer_to_replace][1]] = replacement_layer
 
     def shift_layer(self, print_layer, x_shift=0.0, y_shift=0.0):
+        """Shifts the print layer.
+
+        Args:
+            print_layer (int): The print layer to shift.
+            x_shift (float): The amount to shift the layer by in the X direction.
+            y_shift: The amount to shift the layer by in the Y direction.
+        """
+
         # extract layer from gcode corresponding to print layer
         print_layer_gcode = self.extract_layer(print_layer)
 
@@ -70,6 +94,14 @@ class GcodeModifier:
         print(f"Shifted layer {print_layer} by dX = {x_shift}, dY = {y_shift}.")
 
     def garble_layer(self, print_layer, max_shift_x=0.0, max_shift_y=0.0):
+        """Randomly garble the print layer.
+
+        Args:
+            print_layer: The print layer to garble.
+            max_shift_x: The max amount to shift X.
+            max_shift_y: The max amount to shift Y.
+        """
+
         # extract layer from gcode corresponding to print layer
         print_layer_gcode = self.extract_layer(print_layer)
 
