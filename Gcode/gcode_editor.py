@@ -2,8 +2,6 @@ import pathlib
 import re
 import random
 
-gcode_input_file = 'Cube 0.6mm 20%.gcode'
-
 
 class GcodeModifier:
     def __init__(self, gcode_filepath):
@@ -15,32 +13,39 @@ class GcodeModifier:
         self.print_layers = self.get_print_layers()
 
     def get_print_layers(self):
+        """Gets line numbers of each print layer.
+
+        Returns:
+            dict: Layer number and gcode line index.
+        """
+
         layers = dict()
 
-        p = re.compile(r'LAYER:(?P<value>\d+)')
+        p_start = re.compile(r'LAYER:(?P<value>\d+)')
+        p_end = re.compile(r'TIME_ELAPSED')
 
         # search each line for LAYER:
-        for line in self.gcode:
-            m = p.search(line)
+        for start_i, gcode_line in enumerate(self.gcode):
+            m_start = p_start.search(gcode_line)
 
-            # if found, store layer number and gcode line index in dict
-            if m:
-                layers[int(m.group('value'))] = self.gcode.index(line)
+            # if found, search for corresponding TIME_ELAPSED within layer
+            # signifies end of layer
+            if m_start:
+                for end_i, layer_line in enumerate(self.gcode[start_i:]):
+                    m_end = p_end.search(layer_line)
+
+                    # if found, store start and end index of layer in dict
+                    if m_end:
+                        layers[int(m_start.group('value'))] = (start_i, end_i + start_i)
+                        break
 
         return layers
 
     def extract_layer(self, layer_to_extract):
-        try:
-            extracted_layer = self.gcode[self.print_layers[layer_to_extract]:self.print_layers[layer_to_extract + 1]]
-        except IndexError as err:
-            extracted_layer = self.gcode[self.print_layers[layer_to_extract]:]
-        return extracted_layer
+        return self.gcode[self.print_layers[layer_to_extract[0]]:self.print_layers[layer_to_extract[1]]]
 
     def replace_layer(self, layer_to_replace, replacement_layer):
-        try:
-            self.gcode[self.print_layers[layer_to_replace]:self.print_layers[layer_to_replace + 1]] = replacement_layer
-        except IndexError:
-            self.gcode[self.print_layers[layer_to_replace]:] = replacement_layer
+        self.gcode[self.print_layers[layer_to_replace[0]]:self.print_layers[layer_to_replace[1]]] = replacement_layer
 
     def shift_layer(self, print_layer, x_shift=0.0, y_shift=0.0):
         # extract layer from gcode corresponding to print layer
